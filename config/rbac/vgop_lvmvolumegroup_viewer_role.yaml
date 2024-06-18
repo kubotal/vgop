@@ -1,0 +1,23 @@
+# permissions for end users to view lvmvolumegroups.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: vgop
+    app.kubernetes.io/managed-by: kustomize
+  name: vgop-lvmvolumegroup-viewer-role
+rules:
+- apiGroups:
+  - vgop.kubotal.io
+  resources:
+  - lvmvolumegroups
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vgop.kubotal.io
+  resources:
+  - lvmvolumegroups/status
+  verbs:
+  - get

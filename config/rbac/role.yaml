@@ -1,0 +1,32 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - vgop.kubotal.io
+  resources:
+  - lvmvolumegroups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vgop.kubotal.io
+  resources:
+  - lvmvolumegroups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vgop.kubotal.io
+  resources:
+  - lvmvolumegroups/status
+  verbs:
+  - get
+  - patch
+  - update

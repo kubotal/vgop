@@ -1,0 +1,9 @@
+apiVersion: vgop.kubotal.io/v1alpha1
+kind: LVMVolumeGroup
+metadata:
+  labels:
+    app.kubernetes.io/name: vgop
+    app.kubernetes.io/managed-by: kustomize
+  name: lvmvolumegroup-sample
+spec:
+  # TODO(user): Add fields here

@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- vgop_v1alpha1_lvmvolumegroup.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
