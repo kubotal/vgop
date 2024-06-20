@@ -5,7 +5,7 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - vgop.kubotal.io
+  - vgmanager.kubotal.io
   resources:
   - lvmvolumegroups
   verbs:
@@ -17,13 +17,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - vgop.kubotal.io
+  - vgmanager.kubotal.io
   resources:
   - lvmvolumegroups/finalizers
   verbs:
   - update
 - apiGroups:
-  - vgop.kubotal.io
+  - vgmanager.kubotal.io
   resources:
   - lvmvolumegroups/status
   verbs:

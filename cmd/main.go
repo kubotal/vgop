@@ -1,5 +1,6 @@
 /*
-Copyright 2024.
+Copyright © 2023 Red Hat, Inc.
+Copyright 2024 Kubotal SAS.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +20,13 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
+	"vgop/internal/controllers/vgmanager/dmsetup"
+	"vgop/internal/controllers/vgmanager/filter"
+	"vgop/internal/controllers/vgmanager/lsblk"
+	"vgop/internal/controllers/vgmanager/lvm"
+	"vgop/internal/controllers/vgmanager/wipefs"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -35,7 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	vgopv1alpha1 "vgop/api/vgop/v1alpha1"
-	vgopcontroller "vgop/internal/controller/vgop"
+	"vgop/internal/controllers/vgmanager"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -86,7 +93,8 @@ func main() {
 		c.NextProtos = []string{"http/1.1"}
 	}
 
-	tlsOpts := []func(*tls.Config){}
+	tlsOpts := make([]func(*tls.Config), 0)
+
 	if !enableHTTP2 {
 		tlsOpts = append(tlsOpts, disableHTTP2)
 	}
@@ -123,9 +131,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&vgopcontroller.LVMVolumeGroupReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+	theLvm := lvm.NewDefaultHostLVM()
+	nodeName := os.Getenv("NODE_NAME")
+
+	operatorNamespace, err := getOperatorNamespace()
+	if err != nil {
+		setupLog.Error(err, "unable to get operatorNamespace")
+		os.Exit(1)
+	}
+
+	if err = (&vgmanager.Reconciler{
+		Client:        mgr.GetClient(),
+		EventRecorder: mgr.GetEventRecorderFor(vgmanager.ControllerName),
+		Scheme:        mgr.GetScheme(),
+		LSBLK:         lsblk.NewDefaultHostLSBLK(),
+		Wipefs:        wipefs.NewDefaultHostWipefs(),
+		Dmsetup:       dmsetup.NewDefaultHostDmsetup(),
+		LVM:           theLvm,
+		NodeName:      nodeName,
+		Namespace:     operatorNamespace,
+		Filters:       filter.DefaultFilters,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LVMVolumeGroup")
 		os.Exit(1)
@@ -146,4 +171,18 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+const OperatorNamespaceEnvVar = "NAMESPACE"
+
+// GetOperatorNamespace returns the Namespace the operator should be watching for changes
+func getOperatorNamespace() (string, error) {
+	// The env variable NAMESPACE which specifies the Namespace the pod is running in
+	// and hence will watch.
+
+	ns, found := os.LookupEnv(OperatorNamespaceEnvVar)
+	if !found {
+		return "", fmt.Errorf("%s not found", OperatorNamespaceEnvVar)
+	}
+	return ns, nil
 }

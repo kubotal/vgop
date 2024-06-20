@@ -8,7 +8,7 @@ metadata:
   name: vgop-lvmvolumegroup-editor-role
 rules:
 - apiGroups:
-  - vgop.kubotal.io
+  - vgmanager.kubotal.io
   resources:
   - lvmvolumegroups
   verbs:
@@ -20,7 +20,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - vgop.kubotal.io
+  - vgmanager.kubotal.io
   resources:
   - lvmvolumegroups/status
   verbs:

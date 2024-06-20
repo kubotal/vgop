@@ -27,7 +27,7 @@ import (
 	"vgop/test/utils"
 )
 
-const namespace = "vgop-system"
+const namespace = "vgmanager-system"
 
 var _ = Describe("controller", Ordered, func() {
 	BeforeAll(func() {
@@ -60,7 +60,7 @@ var _ = Describe("controller", Ordered, func() {
 			var err error
 
 			// projectimage stores the name of the image used in the example
-			var projectimage = "example.com/vgop:v0.0.1"
+			var projectimage = "example.com/vgmanager:v0.0.1"
 
 			By("building the manager(Operator) image")
 			cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectimage))

@@ -1,4 +1,4 @@
-apiVersion: vgop.kubotal.io/v1alpha1
+apiVersion: vgmanager.kubotal.io/v1alpha1
 kind: LVMVolumeGroup
 metadata:
   labels:

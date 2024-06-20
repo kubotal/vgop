@@ -17,5 +17,5 @@ y
 
 make manifests
 
-git commit -m "Initial commit"
+git commit -a -m "Initial commit"
 ```
