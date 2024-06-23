@@ -22,11 +22,15 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"vgop/internal/controllers/vgmanager/dmsetup"
 	"vgop/internal/controllers/vgmanager/filter"
 	"vgop/internal/controllers/vgmanager/lsblk"
 	"vgop/internal/controllers/vgmanager/lvm"
 	"vgop/internal/controllers/vgmanager/wipefs"
+	"vgop/internal/global"
+	"vgop/internal/misc"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -37,10 +41,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
-
 	vgopv1alpha1 "vgop/api/vgop/v1alpha1"
 	"vgop/internal/controllers/vgmanager"
 	// +kubebuilder:scaffold:imports
@@ -58,29 +59,47 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+// NoManagedFields removes the managedFields from the object.
+// This is used to reduce memory usage of the objects in the cache.
+// This MUST NOT be used for SSA.
+func NoManagedFields(i any) (any, error) {
+	it, ok := i.(client.Object)
+	if !ok {
+		return nil, fmt.Errorf("unexpected object type: %T", i)
+	}
+	it.SetManagedFields(nil)
+	return it, nil
+}
+
 func main() {
 	var metricsAddr string
-	var enableLeaderElection bool
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
-	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metric endpoint binds to. "+
-		"Use the port :8080. If not set, it will be 0 in order to disable the metrics server")
+	var logConfig misc.LogConfig
+
+	flag.StringVar(&logConfig.Mode, "logMode", "json", "Log mode: 'dev' or 'json'")
+	flag.StringVar(&logConfig.Level, "logLevel", "info", "Log level")
+	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metric endpoint binds to. Use the port :8080. If not set, it will be 0 in order to disable the metrics server")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&secureMetrics, "metrics-secure", false,
-		"If set the metrics endpoint is served securely")
-	flag.BoolVar(&enableHTTP2, "enable-http2", false,
-		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	opts := zap.Options{
-		Development: true,
-	}
-	opts.BindFlags(flag.CommandLine)
+	flag.BoolVar(&secureMetrics, "metrics-secure", false, "If set the metrics endpoint is served securely")
+	flag.BoolVar(&enableHTTP2, "enable-http2", false, "If set, HTTP/2 will be enabled for the metrics server")
+
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	logger, err := misc.HandleLog(&logConfig)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Unable to set logging configuration: %v\n", err)
+		os.Exit(2)
+	}
+	//opts := zap.Options{
+	//	Development: true,
+	//}
+	//opts.BindFlags(flag.CommandLine)
+
+	ctrl.SetLogger(logger)
+
+	logger.Info("vgop controller start", "version", global.Version, "build", global.BuildTs, "logLevel", logConfig.Level)
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -99,9 +118,14 @@ func main() {
 		tlsOpts = append(tlsOpts, disableHTTP2)
 	}
 
-	webhookServer := webhook.NewServer(webhook.Options{
-		TLSOpts: tlsOpts,
-	})
+	//webhookServer := webhook.NewServer(webhook.Options{
+	//	TLSOpts: tlsOpts,
+	//})
+	operatorNamespace, err := getOperatorNamespace()
+	if err != nil {
+		setupLog.Error(err, "unable to get operatorNamespace")
+		os.Exit(1)
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
@@ -110,21 +134,16 @@ func main() {
 			SecureServing: secureMetrics,
 			TLSOpts:       tlsOpts,
 		},
-		WebhookServer:          webhookServer,
+		//WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "d72a05fd.kubotal.io",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
+		LeaderElection:         false, // We will be in a daemonSet
+		Cache: cache.Options{
+			DefaultTransform: NoManagedFields,
+			ByObject: map[client.Object]cache.ByObject{
+				&vgopv1alpha1.LVMVolumeGroup{}:           {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
+				&vgopv1alpha1.LVMVolumeGroupNodeStatus{}: {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
+			},
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -133,12 +152,6 @@ func main() {
 
 	theLvm := lvm.NewDefaultHostLVM()
 	nodeName := os.Getenv("NODE_NAME")
-
-	operatorNamespace, err := getOperatorNamespace()
-	if err != nil {
-		setupLog.Error(err, "unable to get operatorNamespace")
-		os.Exit(1)
-	}
 
 	if err = (&vgmanager.Reconciler{
 		Client:        mgr.GetClient(),

@@ -2,7 +2,8 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- ../../tmp/vgop.kubotal.io_lvmvolumegroups.yaml
+  - bases/vgop.kubotal.io_lvmvolumegroups.yaml
+  - bases/vgop.kubotal.io_lvmvolumegroupnodestatuses.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

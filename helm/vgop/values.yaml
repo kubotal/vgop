@@ -1,0 +1,75 @@
+
+# Allow to change some logger configuration
+logger:
+  mode: json
+  level: info
+
+
+image:
+  pullSecrets: []
+  repository: quay.io/kubotal/vgop
+  # -- Overrides the image tag whose default is the chart appVersion.
+  tag:
+  pullPolicy: IfNotPresent
+
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+
+tolerations: {}
+  # these tolerations are to have the daemonset runnable on control plane nodes
+  # Add them if your control plane nodes should not run pods
+#  - key: node-role.kubernetes.io/control-plane
+#    operator: Exists
+#    effect: NoSchedule
+#  - key: node-role.kubernetes.io/master
+#    operator: Exists
+#    effect: NoSchedule
+
+# Security Context for container
+containerSecurityContext:
+  privileged: true
+
+# -- Security Context for the whole pod
+podSecurityContext: {}
+
+
+
+# -- Annotations to be added to the pod
+podAnnotations: {}
+
+# -- Annotations to be added to all other resources
+commonAnnotations: {}
+
+
+# Following will allow a renaming of all vgop kubernetes resources
+# Keep default values in usual cases.
+# -- Allow chart name overriding
+nameOverride:
+# -- Allow overriding base name of all resources
+fullNameOverride:
+# -- Will default to {{ include "vgop.fullname" . }}
+deploymentName:
+# -- Will default to {{ include "vgop.serviceAccountName" . }}
+serviceAccountName:
+# -- Will default to {{ include "vgop.roleName" . }}
+roleName:
+# -- Will default to {{ include "vgop.clusterRoleName" . }}
+clusterRoleName:
+
+
+# -- Hooks for specific configuration. Leave as is for standard usage
+command:
+extraEnv:
+additionalArgs: []
+disableProbes: false
+extraVolumes: []
+#   - name:
+#     mountPath:
+#     claimName:

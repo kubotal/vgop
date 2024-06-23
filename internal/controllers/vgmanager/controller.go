@@ -1,5 +1,6 @@
 /*
 Copyright © 2023 Red Hat, Inc.
+Copyright 2024 Kubotal SAS.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,6 +33,7 @@ import (
 	"vgop/internal/controllers/vgmanager/wipefs"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -101,6 +103,13 @@ func (r *Reconciler) getFinalizer() string {
 	return fmt.Sprintf("%s/%s", NodeCleanupFinalizer, r.NodeName)
 }
 
+//+kubebuilder:rbac:groups=vgop.kubotal.io,resources=lvmvolumegroups,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=vgop.kubotal.io,resources=lvmvolumegroups/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=vgop.kubotal.io,resources=lvmvolumegroups/finalizers,verbs=update
+//+kubebuilder:rbac:groups=vgop.kubotal.io,resources=lvmvolumegroupnodestatuses,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=vgop.kubotal.io,resources=lvmvolumegroupnodestatuses/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=vgop.kubotal.io,resources=lvmvolumegroupnodestatuses/finalizers,verbs=update
+
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.V(1).Info("reconciling")
@@ -124,17 +133,22 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	nodeStatus := r.getLVMVolumeGroupNodeStatus()
 	if err := r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus); err != nil {
-		return ctrl.Result{}, fmt.Errorf("could not get LVMVolumeGroupNodeStatus: %w", err)
+		if !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("could not get LVMVolumeGroupNodeStatus for node %s: %w", r.NodeName, err)
+		}
+		logger.V(1).Info("Will create LVMVolumeGroupNodeStatus", "node", r.NodeName)
+		nodeStatus.SetFinalizers(append(nodeStatus.Finalizers, deleteProtectionFinalizer))
+		if err := r.Client.Create(ctx, nodeStatus); err != nil {
+			return ctrl.Result{}, fmt.Errorf("could not create LVMVolumeGroupNodeStatus for node %s: %w", r.NodeName, err)
+		}
 	}
 
 	return r.reconcile(ctx, volumeGroup, nodeStatus)
 }
 
-func (r *Reconciler) reconcile(
-	ctx context.Context,
-	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
-	nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus,
-) (ctrl.Result, error) {
+const deleteProtectionFinalizer = "delete-protection.vgop.kubotal.io"
+
+func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	// Check if the LVMVolumeGroup resource is deleted
 	if !volumeGroup.DeletionTimestamp.IsZero() {
@@ -316,7 +330,7 @@ func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolume
 	return ctrl.Result{}
 }
 
-// REMOVED: We don't want to be bound to topolvm config
+// REMOVED: We don't want to be bound to  topolvm config
 
 //func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) error {
 //	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
