@@ -208,18 +208,17 @@ func TestHostLVM_DeleteVG(t *testing.T) {
 							pvArgs = append(pvArgs, pv.PvName)
 						}
 						assert.ElementsMatch(t, args, pvArgs)
-					case lvmDevicesCmd:
-						if tt.lvmdevicesErr != nil {
-							return tt.lvmdevicesErr
-						}
-						assert.ElementsMatch(t, args, []string{"--delpvid"})
-						for _, pv := range tt.volumeGroup.PVs {
-							if pv.UUID == args[2] {
-								assert.ElementsMatch(t, args, []string{"--delpvid", pv.UUID})
-							}
-						}
+						//case lvmDevicesCmd:
+						//	if tt.lvmdevicesErr != nil {
+						//		return tt.lvmdevicesErr
+						//	}
+						//	assert.ElementsMatch(t, args, []string{"--delpvid"})
+						//	for _, pv := range tt.volumeGroup.PVs {
+						//		if pv.UUID == args[2] {
+						//			assert.ElementsMatch(t, args, []string{"--delpvid", pv.UUID})
+						//		}
+						//	}
 					}
-
 					return nil
 				},
 			}

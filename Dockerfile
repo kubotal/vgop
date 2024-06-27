@@ -23,11 +23,19 @@ COPY internal/ internal/
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o vgop cmd/main.go
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
+
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+# Install some misc tools and base python3 stuff
+RUN apt-get update && \
+    apt-get -y upgrade && \
+    apt-get install -y tini util-linux lvm2 && \
+    rm -rf /var/lib/apt/lists/* &&  \
+    rm -rf /var/cache/apt/*
+
 WORKDIR /
 COPY --from=builder /workspace/vgop .
-USER 65532:65532
+USER 0:0
 
 ENTRYPOINT ["/vgop"]

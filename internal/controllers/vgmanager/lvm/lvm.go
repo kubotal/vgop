@@ -34,19 +34,19 @@ type ExitError interface {
 }
 
 const (
-	vgsCmd        = "/usr/sbin/vgs"
-	pvsCmd        = "/usr/sbin/pvs"
-	lvsCmd        = "/usr/sbin/lvs"
-	vgCreateCmd   = "/usr/sbin/vgcreate"
-	vgChangeCmd   = "/usr/sbin/vgchange"
-	vgExtendCmd   = "/usr/sbin/vgextend"
-	vgRemoveCmd   = "/usr/sbin/vgremove"
-	pvRemoveCmd   = "/usr/sbin/pvremove"
-	lvCreateCmd   = "/usr/sbin/lvcreate"
-	lvExtendCmd   = "/usr/sbin/lvextend"
-	lvRemoveCmd   = "/usr/sbin/lvremove"
-	lvChangeCmd   = "/usr/sbin/lvchange"
-	lvmDevicesCmd = "/usr/sbin/lvmdevices"
+	vgsCmd      = "/usr/sbin/vgs"
+	pvsCmd      = "/usr/sbin/pvs"
+	lvsCmd      = "/usr/sbin/lvs"
+	vgCreateCmd = "/usr/sbin/vgcreate"
+	vgChangeCmd = "/usr/sbin/vgchange"
+	vgExtendCmd = "/usr/sbin/vgextend"
+	vgRemoveCmd = "/usr/sbin/vgremove"
+	pvRemoveCmd = "/usr/sbin/pvremove"
+	lvCreateCmd = "/usr/sbin/lvcreate"
+	lvExtendCmd = "/usr/sbin/lvextend"
+	lvRemoveCmd = "/usr/sbin/lvremove"
+	lvChangeCmd = "/usr/sbin/lvchange"
+	// lvmDevicesCmd = "/usr/sbin/lvmdevices" Removed has does not exists on ubuntu (old command ?)
 
 	lvmsTag = "@lvms"
 )
@@ -245,16 +245,17 @@ func (hlvm *HostLVM) DeleteVG(ctx context.Context, vg VolumeGroup) error {
 		return fmt.Errorf("failed to remove physical volumes for the volume group %q: %w", vg.Name, err)
 	}
 
-	for _, pv := range vg.PVs {
-		err := hlvm.RunCommandAsHost(ctx, lvmDevicesCmd, "--delpvid", pv.UUID)
-		if err, ok := exec.AsExecError(err); ok && err.ExitCode() == 5 {
-			// Exit Code 5 On lvmdevices --delpvid means that the PV with that UUID no longer exists
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("failed to delete PV %s from device file for the volume group %s: %w", pv.UUID, vg.Name, err)
-		}
-	}
+	// lvmDevices command removed
+	//for _, pv := range vg.PVs {
+	//	err := hlvm.RunCommandAsHost(ctx, lvmDevicesCmd, "--delpvid", pv.UUID)
+	//	if err, ok := exec.AsExecError(err); ok && err.ExitCode() == 5 {
+	//		// Exit Code 5 On lvmdevices --delpvid means that the PV with that UUID no longer exists
+	//		continue
+	//	}
+	//	if err != nil {
+	//		return fmt.Errorf("failed to delete PV %s from device file for the volume group %s: %w", pv.UUID, vg.Name, err)
+	//	}
+	//}
 
 	return nil
 }

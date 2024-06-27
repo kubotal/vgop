@@ -2,5 +2,5 @@
 
 package global
 
-var Version = "0.1.0"
-var BuildTs = "20240621.231437"
+var Version = "0.1.0-snapshot"
+var BuildTs = "20240626.171510"

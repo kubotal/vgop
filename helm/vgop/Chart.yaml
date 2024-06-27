@@ -4,4 +4,4 @@ name: vgop
 version: 0.1.0-snapshot
 sources:
   - https://github.com/kubotal/vgop
-appVersion: 0.1.0
+appVersion: 0.1.0-snapshot

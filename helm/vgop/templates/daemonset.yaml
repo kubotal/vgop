@@ -24,6 +24,7 @@ spec:
         {{- include "vgop.labels" . | nindent 8 }}
         {{- include "vgop.selectorLabels" . | nindent 8 }}
     spec:
+      hostUsers: false
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}

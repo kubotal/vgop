@@ -1,17 +1,12 @@
 # Image URL to use all building/pushing image targets
 
-DOCKER_TAG=0.1.0-snapshot
+APP_VERSION ?= 0.1.0-snapshot
+DOCKER_TAG=${APP_VERSION}
+
 IMG ?= quay.io/kubotal/vgop:${DOCKER_TAG}
 
-# Keep in sync with helm/kad-controller/Chart.yaml
-APP_VERSION ?= 0.1.0
 HELM_VERSION ?= 0.1.0-snapshot
-
-# To authenticate for pushing in github repo (img):
-# echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
-
-# To authenticate for pushing in github repo (helm):
-# echo $GITHUB_TOKEN | helm registry login ghcr.io/$GITHUB_USER -u $GITHUB_USER --password-stdin
+HELM_DOCKER_REPO := quay.io/kubotal/charts
 
 # To authenticate for pushing in quay repo (img) (Use encrypted password):
 # docker login quay.io
@@ -78,26 +73,10 @@ manifests: controller-gen ## placeholder
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-#.PHONY: fmt
-#fmt: ## Run go fmt against code.
-#	go fmt ./...
-
-.PHONY: fmt
-fmt: ## fmt placeholder
-	echo "fmt placeholder"
-
 .PHONY: vet
 vet: ## Run go vet against code.
 	go vet ./...
 
-#.PHONY: test
-#test: manifests generate fmt vet envtest ## Run tests.
-#	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
-
-## Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
-#.PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
-#test-e2e:
-#	go test ./test/e2e/ -v -ginkgo.v
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
@@ -115,12 +94,9 @@ version: ## Update version and build TS
 ##@ Build
 
 .PHONY: build
-build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+build: manifests generate vet ## Build vgop binary.
+	go build -o bin/vgop cmd/main.go
 
-#.PHONY: run
-#run: manifests generate fmt vet ## Run a controller from your host.
-#	go run ./cmd/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
@@ -155,43 +131,9 @@ docker-buildx: version ## Build and push docker image for the manager for cross-
 	- $(CONTAINER_TOOL) buildx rm vgop-builder
 	rm Dockerfile.cross
 
-#.PHONY: build-installer
-#build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
-#	mkdir -p dist
-#	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-#	$(KUSTOMIZE) build config/default > dist/install.yaml
-
-
-#
-#ifndef ignore-not-found
-#  ignore-not-found = false
-#endif
-#
-#.PHONY: install
-#install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-#	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
-#
-#.PHONY: uninstall
-#uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-#	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
-#
-#.PHONY: deploy
-#deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-#	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-#	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
-#
-#.PHONY: undeploy
-#undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-#	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
-
 
 # ----------------------------------------------------------------
 ##@ Helm chart
-
-#.PHONY: deployment
-#deployment: manifests kustomize ## xxxx
-#	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone config/default -o config/daemonset.yaml
-
 
 .PHONY: crds
 crds: manifests kustomize ## Generate crds file into helm chart
@@ -211,6 +153,11 @@ export CHART_YAML
 .PHONY: chart-yaml
 chart-yaml: ## Generate the helm/kad-controller/Chart.yaml
 	echo "$$CHART_YAML" >./helm/vgop/Chart.yaml
+
+.PHONY: chart
+chart: chart-yaml crds ## Build and push helm chart
+	cd ./helm && helm package -d ./../tmp vgop && helm push ./../tmp/vgop-${HELM_VERSION}.tgz oci://${HELM_DOCKER_REPO}
+
 
 
 # ----------------------------------------------------------------

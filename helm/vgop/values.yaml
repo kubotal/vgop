@@ -13,6 +13,17 @@ image:
   pullPolicy: IfNotPresent
 
 
+tolerations: {}
+  # these tolerations are to have the daemonset runnable on control plane nodes
+# Add them if your control plane nodes should not run pods
+#  - key: node-role.kubernetes.io/control-plane
+#    operator: Exists
+#    effect: NoSchedule
+#  - key: node-role.kubernetes.io/master
+#    operator: Exists
+#    effect: NoSchedule
+
+
 resources:
   limits:
     cpu: 500m
@@ -22,23 +33,18 @@ resources:
     memory: 64Mi
 
 
-tolerations: {}
-  # these tolerations are to have the daemonset runnable on control plane nodes
-  # Add them if your control plane nodes should not run pods
-#  - key: node-role.kubernetes.io/control-plane
-#    operator: Exists
-#    effect: NoSchedule
-#  - key: node-role.kubernetes.io/master
-#    operator: Exists
-#    effect: NoSchedule
 
 # Security Context for container
 containerSecurityContext:
   privileged: true
+  procMount: Unmasked
+  runAsUser: 0
+  runAsGroup: 0
 
 # -- Security Context for the whole pod
-podSecurityContext: {}
-
+podSecurityContext:
+  runAsUser: 0
+  runAsGroup: 0
 
 
 # -- Annotations to be added to the pod
