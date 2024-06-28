@@ -1,0 +1,38 @@
+
+{{- range .Values.volumeGroups }}
+---
+apiVersion: vgop.kubotal.io/v1alpha1
+kind: LVMVolumeGroup
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "vgop.labels" $ | nindent 4 }}
+  {{- with $.Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selectors:
+    {{- range .selectors }}
+    - deviceSelector:
+        paths:
+          {{- range .devicePaths }}
+          - {{ . }}
+          {{- end }}
+      nodeSelector:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  {{- range .nodes }}
+                  - {{ . }}
+                  {{- end }}
+    {{- end }}
+{{- end }}
+
+
+
+
+

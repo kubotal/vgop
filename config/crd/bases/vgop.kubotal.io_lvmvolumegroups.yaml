@@ -39,119 +39,123 @@ spec:
           spec:
             description: LVMVolumeGroupSpec defines the desired state of LVMVolumeGroup
             properties:
-              default:
-                description: Default is a flag to indicate whether the device-class
-                  is the default
-                type: boolean
-              deviceSelector:
-                description: DeviceSelector is a set of rules that should match for
-                  a device to be included in this VG
-                properties:
-                  forceWipeDevicesAndDestroyAllData:
-                    description: |-
-                      ForceWipeDevicesAndDestroyAllData is a flag to force wipe the selected devices.
-                      This wipes the file signatures on the devices. Use this feature with caution.
-                      Force wipe the devices only when you know that they do not contain any important data.
-                    type: boolean
-                  optionalPaths:
-                    description: OptionalPaths specify the optional device paths.
-                    items:
-                      type: string
-                    type: array
-                  paths:
-                    description: Paths specify the device paths.
-                    items:
-                      type: string
-                    type: array
-                type: object
-              nodeSelector:
-                description: NodeSelector chooses nodes
-                properties:
-                  nodeSelectorTerms:
-                    description: Required. A list of node selector terms. The terms
-                      are ORed.
-                    items:
-                      description: |-
-                        A null or empty node selector term matches no objects. The requirements of
-                        them are ANDed.
-                        The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
+              selectors:
+                description: |-
+                  Selectors allow to have different configurations for the same VG, for heterogeneous nodes.
+                  Only one selector must match for each node
+                items:
+                  properties:
+                    deviceSelector:
+                      description: DeviceSelector is a set of rules that should match
+                        for a device to be included in this VG
                       properties:
-                        matchExpressions:
-                          description: A list of node selector requirements by node's
-                            labels.
+                        forceWipeDevicesAndDestroyAllData:
+                          description: |-
+                            ForceWipeDevicesAndDestroyAllData is a flag to force wipe the selected devices.
+                            This wipes the file signatures on the devices. Use this feature with caution.
+                            Force wipe the devices only when you know that they do not contain any important data.
+                          type: boolean
+                        optionalPaths:
+                          description: OptionalPaths specify the optional device paths.
+                          items:
+                            type: string
+                          type: array
+                        paths:
+                          description: Paths specify the device paths.
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    nodeSelector:
+                      description: NodeSelector chooses nodes
+                      properties:
+                        nodeSelectorTerms:
+                          description: Required. A list of node selector terms. The
+                            terms are ORed.
                           items:
                             description: |-
-                              A node selector requirement is a selector that contains values, a key, and an operator
-                              that relates the key and values.
+                              A null or empty node selector term matches no objects. The requirements of
+                              them are ANDed.
+                              The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
                             properties:
-                              key:
-                                description: The label key that the selector applies
-                                  to.
-                                type: string
-                              operator:
-                                description: |-
-                                  Represents a key's relationship to a set of values.
-                                  Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
-                                type: string
-                              values:
-                                description: |-
-                                  An array of string values. If the operator is In or NotIn,
-                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
-                                  the values array must be empty. If the operator is Gt or Lt, the values
-                                  array must have a single element, which will be interpreted as an integer.
-                                  This array is replaced during a strategic merge patch.
+                              matchExpressions:
+                                description: A list of node selector requirements
+                                  by node's labels.
                                 items:
-                                  type: string
+                                  description: |-
+                                    A node selector requirement is a selector that contains values, a key, and an operator
+                                    that relates the key and values.
+                                  properties:
+                                    key:
+                                      description: The label key that the selector
+                                        applies to.
+                                      type: string
+                                    operator:
+                                      description: |-
+                                        Represents a key's relationship to a set of values.
+                                        Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                      type: string
+                                    values:
+                                      description: |-
+                                        An array of string values. If the operator is In or NotIn,
+                                        the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                        the values array must be empty. If the operator is Gt or Lt, the values
+                                        array must have a single element, which will be interpreted as an integer.
+                                        This array is replaced during a strategic merge patch.
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                  required:
+                                  - key
+                                  - operator
+                                  type: object
                                 type: array
                                 x-kubernetes-list-type: atomic
-                            required:
-                            - key
-                            - operator
-                            type: object
-                          type: array
-                          x-kubernetes-list-type: atomic
-                        matchFields:
-                          description: A list of node selector requirements by node's
-                            fields.
-                          items:
-                            description: |-
-                              A node selector requirement is a selector that contains values, a key, and an operator
-                              that relates the key and values.
-                            properties:
-                              key:
-                                description: The label key that the selector applies
-                                  to.
-                                type: string
-                              operator:
-                                description: |-
-                                  Represents a key's relationship to a set of values.
-                                  Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
-                                type: string
-                              values:
-                                description: |-
-                                  An array of string values. If the operator is In or NotIn,
-                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
-                                  the values array must be empty. If the operator is Gt or Lt, the values
-                                  array must have a single element, which will be interpreted as an integer.
-                                  This array is replaced during a strategic merge patch.
+                              matchFields:
+                                description: A list of node selector requirements
+                                  by node's fields.
                                 items:
-                                  type: string
+                                  description: |-
+                                    A node selector requirement is a selector that contains values, a key, and an operator
+                                    that relates the key and values.
+                                  properties:
+                                    key:
+                                      description: The label key that the selector
+                                        applies to.
+                                      type: string
+                                    operator:
+                                      description: |-
+                                        Represents a key's relationship to a set of values.
+                                        Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                      type: string
+                                    values:
+                                      description: |-
+                                        An array of string values. If the operator is In or NotIn,
+                                        the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                        the values array must be empty. If the operator is Gt or Lt, the values
+                                        array must have a single element, which will be interpreted as an integer.
+                                        This array is replaced during a strategic merge patch.
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                  required:
+                                  - key
+                                  - operator
+                                  type: object
                                 type: array
                                 x-kubernetes-list-type: atomic
-                            required:
-                            - key
-                            - operator
                             type: object
+                            x-kubernetes-map-type: atomic
                           type: array
                           x-kubernetes-list-type: atomic
+                      required:
+                      - nodeSelectorTerms
                       type: object
                       x-kubernetes-map-type: atomic
-                    type: array
-                    x-kubernetes-list-type: atomic
-                required:
-                - nodeSelectorTerms
-                type: object
-                x-kubernetes-map-type: atomic
+                  type: object
+                type: array
               thinPoolConfig:
                 description: ThinPoolConfig contains configurations for the thin-pool
                 properties:

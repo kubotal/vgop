@@ -1,4 +1,51 @@
 
+
+volumeGroups: []
+#  - name: myvg1
+#    selectors:
+#      - devicePaths:
+#          - /dev/sdc
+#          - /dev/sdd
+#        nodes:
+#          - w1
+#          - w2
+#      - devicePaths:
+#          - /dev/sdc
+#        nodes:
+#          - w3
+#  - name: myvg2
+#    selectors:
+#      - devicePaths:
+#          - /dev/sde
+#        nodes:
+#          - w1
+#          - w2
+#          - w3
+
+
+nodeSelector: {}
+#  lvm.aware: "true"
+
+nodeAffinity: {}
+#  requiredDuringSchedulingIgnoredDuringExecution:
+#    nodeSelectorTerms:
+#      - matchExpressions:
+#          - key: kubernetes.io/hostname
+#            operator: In
+#            values:
+#              - w1
+#              - w2
+
+tolerations: {}
+# these tolerations are to have the daemonset runnable on control plane nodes
+# Add them if your control plane nodes should not run pods
+#  - key: node-role.kubernetes.io/control-plane
+#    operator: Exists
+#    effect: NoSchedule
+#  - key: node-role.kubernetes.io/master
+#    operator: Exists
+#    effect: NoSchedule
+
 # Allow to change some logger configuration
 logger:
   mode: json
@@ -12,18 +59,6 @@ image:
   tag:
   pullPolicy: IfNotPresent
 
-
-tolerations: {}
-  # these tolerations are to have the daemonset runnable on control plane nodes
-# Add them if your control plane nodes should not run pods
-#  - key: node-role.kubernetes.io/control-plane
-#    operator: Exists
-#    effect: NoSchedule
-#  - key: node-role.kubernetes.io/master
-#    operator: Exists
-#    effect: NoSchedule
-
-
 resources:
   limits:
     cpu: 500m
@@ -31,8 +66,6 @@ resources:
   requests:
     cpu: 10m
     memory: 64Mi
-
-
 
 # Security Context for container
 containerSecurityContext:

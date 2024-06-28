@@ -11,15 +11,15 @@ import (
 	"vgop/internal/controllers/vgmanager/lsblk"
 )
 
-func (r *Reconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, blockDevices []lsblk.BlockDevice) (bool, error) {
+func (r *Reconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, selector *lvmv1alpha1.Selector, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, blockDevices []lsblk.BlockDevice) (bool, error) {
 	logger := log.FromContext(ctx)
 
-	if volumeGroup.Spec.DeviceSelector == nil || volumeGroup.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData == nil || !*volumeGroup.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData {
+	if selector.DeviceSelector == nil || selector.DeviceSelector.ForceWipeDevicesAndDestroyAllData == nil || !*selector.DeviceSelector.ForceWipeDevicesAndDestroyAllData {
 		return false, nil
 	}
 
 	wiped := false
-	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
+	for _, path := range selector.DeviceSelector.Paths {
 		diskName, err := evalSymlinks(path)
 		if err != nil {
 			return false, fmt.Errorf("unable to find symlink for disk path %s: %v", path, err)
@@ -35,7 +35,7 @@ func (r *Reconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *lv
 			wiped = true
 		}
 	}
-	for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
+	for _, path := range selector.DeviceSelector.OptionalPaths {
 		diskName, err := evalSymlinks(path)
 		if err != nil {
 			logger.Info(fmt.Sprintf("skipping wiping optional device %s as unable to find symlink: %v", path, err))

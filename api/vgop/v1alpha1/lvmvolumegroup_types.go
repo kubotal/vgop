@@ -25,8 +25,7 @@ import (
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// LVMVolumeGroupSpec defines the desired state of LVMVolumeGroup
-type LVMVolumeGroupSpec struct {
+type Selector struct {
 	// DeviceSelector is a set of rules that should match for a device to be included in this VG
 	// +optional
 	DeviceSelector *DeviceSelector `json:"deviceSelector,omitempty"`
@@ -34,6 +33,13 @@ type LVMVolumeGroupSpec struct {
 	// NodeSelector chooses nodes
 	// +optional
 	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
+}
+
+// LVMVolumeGroupSpec defines the desired state of LVMVolumeGroup
+type LVMVolumeGroupSpec struct {
+	// Selectors allow to have different configurations for the same VG, for heterogeneous nodes.
+	// Only one selector must match for each node
+	Selectors []Selector `json:"selectors,omitempty"`
 
 	// ThinPoolConfig contains configurations for the thin-pool
 	// +optional
@@ -41,7 +47,7 @@ type LVMVolumeGroupSpec struct {
 
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional
-	Default bool `json:"default,omitempty"`
+	//Default bool `json:"default,omitempty"`
 }
 
 // LVMVolumeGroupStatus defines the observed state of LVMVolumeGroup

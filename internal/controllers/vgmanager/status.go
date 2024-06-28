@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
+func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, selector *lvmv1alpha1.Selector, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusProgressing,
@@ -43,10 +43,10 @@ func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lv
 		return false, err
 	}
 
-	return r.setVolumeGroupStatus(ctx, vg, status)
+	return r.setVolumeGroupStatus(ctx, vg, selector, status)
 }
 
-func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
+func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, selector *lvmv1alpha1.Selector, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusReady,
@@ -57,10 +57,10 @@ func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alp
 		return false, err
 	}
 
-	return r.setVolumeGroupStatus(ctx, vg, status)
+	return r.setVolumeGroupStatus(ctx, vg, selector, status)
 }
 
-func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices, err error) (bool, error) {
+func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, selector *lvmv1alpha1.Selector, vgs []lvm.VolumeGroup, devices FilteredBlockDevices, err error) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusFailed,
@@ -75,13 +75,13 @@ func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1al
 		status.Status = lvmv1alpha1.VGStatusDegraded
 	}
 
-	return r.setVolumeGroupStatus(ctx, vg, status)
+	return r.setVolumeGroupStatus(ctx, vg, selector, status)
 }
 
-func (r *Reconciler) setVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, status *lvmv1alpha1.VGStatus) (bool, error) {
+func (r *Reconciler) setVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, selector *lvmv1alpha1.Selector, status *lvmv1alpha1.VGStatus) (bool, error) {
 	logger := log.FromContext(ctx).WithValues("VolumeGroup", client.ObjectKeyFromObject(vg))
 
-	if vg.Spec.DeviceSelector == nil {
+	if selector.DeviceSelector == nil {
 		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyRuntimeDynamic
 	} else {
 		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured
