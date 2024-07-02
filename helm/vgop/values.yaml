@@ -3,24 +3,24 @@
 volumeGroups: []
 #  - name: myvg1
 #    selectors:
-#      - devicePaths:
+#      - nodes:
+#          - w1
+#          - w2
+#        devicePaths:
 #          - /dev/sdc
 #          - /dev/sdd
-#        nodes:
-#          - w1
-#          - w2
-#      - devicePaths:
-#          - /dev/sdc
-#        nodes:
+#      - nodes:
 #          - w3
+#        devicePaths:
+#          - /dev/sdc
 #  - name: myvg2
 #    selectors:
-#      - devicePaths:
-#          - /dev/sde
-#        nodes:
+#      - nodes:
 #          - w1
 #          - w2
 #          - w3
+#        devicePaths:
+#          - /dev/sde
 
 
 nodeSelector: {}

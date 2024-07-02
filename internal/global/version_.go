@@ -3,4 +3,4 @@
 package global
 
 var Version = "0.1.0-snapshot"
-var BuildTs = "20240627.185749"
+var BuildTs = "20240701.131638"

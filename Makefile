@@ -39,8 +39,11 @@ SHELL = /usr/bin/env bash -o pipefail
 BUILD_TS ?= $(shell date -u +%Y%m%d.%H%M%S)
 
 
-.PHONY: all
-all: help
+.PHONY: entry
+entry: help
+
+publish: chart docker-buildx doc ## Publish current version
+	@echo "********************** Don't forget to commit ***************************"
 
 ##@ General
 

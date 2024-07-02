@@ -15,6 +15,7 @@ In fact, this project is mostly a repackaging of a part of this wider project.
 
 - [Installation](#installation)
 - [Usage](#usage)
+  - [VG creation at installation.](#vg-creation-at-installation)
   - [Status](#status)
 - [Configuration](#configuration)
   - [nodeAffinity](#nodeaffinity)
@@ -100,6 +101,30 @@ spec:
               operator: In
               values:
                 - w3
+```
+
+> WARNING: Currently, there is no validation webhook. This means most errors, such as using the same device several 
+times, or wrong node name, or any other incoherency will not be detected upfront, and will leads some unpredictable results. 
+
+### VG creation at installation.
+
+It is also possible to create such resources during helm chart deployment, be adding properties in a local 
+`values.yaml` file. for example:
+
+```
+volumeGroups: 
+  - name: myvg1
+    selectors:
+      - devicePaths:
+          - /dev/sdc
+          - /dev/sdd
+        nodes:
+          - w1
+          - w2
+      - devicePaths:
+          - /dev/sdc
+        nodes:
+          - w3
 ```
 
 ### Status
