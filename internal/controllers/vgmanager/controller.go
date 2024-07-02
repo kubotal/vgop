@@ -120,12 +120,21 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Check if the nodeSelector matches the labels on this node
-	nodeMatches, err := r.matchesThisNode(ctx, volumeGroup.Spec.NodeSelector)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to match nodeSelector to node labels: %w", err)
+	var mySelector *lvmv1alpha1.Selector = nil
+	for _, selector := range volumeGroup.Spec.Selectors {
+		// Check if the nodeSelector matches the labels on this node
+		nodeMatches, err := r.matchesThisNode(ctx, selector.NodeSelector)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to match nodeSelector to node labels: %w", err)
+		}
+		if nodeMatches {
+			if mySelector != nil {
+				return ctrl.Result{}, fmt.Errorf("multiple matching nodes matched the selector")
+			}
+			mySelector = &selector
+		}
 	}
-	if !nodeMatches {
+	if mySelector == nil {
 		// Nothing to be done on this node for the VG.
 		logger.Info("node labels do not match the selector", "VGName", volumeGroup.Name)
 		return ctrl.Result{}, nil
@@ -143,16 +152,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 
-	return r.reconcile(ctx, volumeGroup, nodeStatus)
+	return r.reconcile(ctx, volumeGroup, mySelector, nodeStatus)
 }
 
 const deleteProtectionFinalizer = "delete-protection.vgop.kubotal.io"
 
-func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus) (ctrl.Result, error) {
+func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, selector *lvmv1alpha1.Selector, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	// Check if the LVMVolumeGroup resource is deleted
 	if !volumeGroup.DeletionTimestamp.IsZero() {
-		return ctrl.Result{}, r.processDelete(ctx, volumeGroup)
+		return ctrl.Result{}, r.processDelete(ctx, volumeGroup, selector)
 	} else {
 		if added := controllerutil.AddFinalizer(volumeGroup, r.getFinalizer()); added {
 			logger.Info("adding finalizer")
@@ -167,7 +176,7 @@ func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVM
 
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
 
-	wiped, err := r.wipeDevicesIfNecessary(ctx, volumeGroup, nodeStatus, blockDevices)
+	wiped, err := r.wipeDevicesIfNecessary(ctx, volumeGroup, selector, nodeStatus, blockDevices)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to wipe devices: %w", err)
 	}
@@ -181,11 +190,11 @@ func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVM
 	// Get the available block devices that can be used for this volume group
 	// valid means that it can be used to create or extend the volume group
 	// devices that are already part of the volume group will not be returned
-	newDevices, err := r.getNewDevicesToBeAdded(ctx, blockDevices, nodeStatus, volumeGroup)
+	newDevices, err := r.getNewDevicesToBeAdded(ctx, blockDevices, nodeStatus, volumeGroup, selector)
 	if err != nil {
 		err := fmt.Errorf("failed to get matching available block devices for volumegroup %s: %w", volumeGroup.GetName(), err)
 		r.WarningEvent(ctx, volumeGroup, EventReasonErrorDevicePathCheckFailed, err)
-		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, nil, FilteredBlockDevices{}, err); err != nil {
+		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, selector, nil, FilteredBlockDevices{}, err); err != nil {
 			logger.Error(err, "failed to set status to failed")
 		}
 		return ctrl.Result{}, err
@@ -227,7 +236,7 @@ func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVM
 		if !vgExistsInLVM {
 			err := fmt.Errorf("the volume group %s does not exist and there were no available devices to create it", volumeGroup.GetName())
 			r.WarningEvent(ctx, volumeGroup, EventReasonErrorNoAvailableDevicesForVG, err)
-			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, selector, vgs, devices, err); err != nil {
 				logger.Error(err, "failed to set status to failed")
 			}
 			return ctrl.Result{}, err
@@ -241,7 +250,7 @@ func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVM
 			if err := r.validateLVs(ctx, volumeGroup); err != nil {
 				err := fmt.Errorf("error while validating logical volumes in existing volume group: %w", err)
 				r.WarningEvent(ctx, volumeGroup, EventReasonErrorInconsistentLVs, err)
-				if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+				if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, selector, vgs, devices, err); err != nil {
 					logger.Error(err, "failed to set status to failed")
 				}
 				return ctrl.Result{}, err
@@ -252,7 +261,7 @@ func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVM
 		//	return ctrl.Result{}, err
 		//}
 
-		if updated, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, vgs, devices); err != nil {
+		if updated, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, selector, vgs, devices); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to set status for volume group %s to ready: %w", volumeGroup.Name, err)
 		} else if updated {
 			msg := "all the available devices are attached to the volume group"
@@ -260,9 +269,9 @@ func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVM
 			r.NormalEvent(ctx, volumeGroup, EventReasonVolumeGroupReady, msg)
 		}
 
-		return r.determineFinishedRequeue(volumeGroup), nil
+		return r.determineFinishedRequeue(selector), nil
 	} else {
-		if updated, err := r.setVolumeGroupProgressingStatus(ctx, volumeGroup, vgs, devices); err != nil {
+		if updated, err := r.setVolumeGroupProgressingStatus(ctx, volumeGroup, selector, vgs, devices); err != nil {
 			logger.Error(err, "failed to set status to progressing")
 		} else if updated {
 			logger.Info("new available devices were discovered and status was updated to progressing")
@@ -276,7 +285,7 @@ func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVM
 	if err = r.addDevicesToVG(ctx, vgs, volumeGroup.Name, devices.Available); err != nil {
 		err = fmt.Errorf("failed to create/extend volume group %s: %w", volumeGroup.Name, err)
 		r.WarningEvent(ctx, volumeGroup, EventReasonErrorVGCreateOrExtendFailed, err)
-		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, selector, vgs, devices, err); err != nil {
 			logger.Error(err, "failed to set status to failed")
 		}
 		return ctrl.Result{}, err
@@ -287,7 +296,7 @@ func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVM
 		if err = r.addThinPoolToVG(ctx, volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig); err != nil {
 			err := fmt.Errorf("failed to create thin pool %s for volume group %s: %w", volumeGroup.Spec.ThinPoolConfig.Name, volumeGroup.Name, err)
 			r.WarningEvent(ctx, volumeGroup, EventReasonErrorThinPoolCreateOrExtendFailed, err)
-			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, selector, vgs, devices, err); err != nil {
 				logger.Error(err, "failed to set status to failed")
 			}
 			return ctrl.Result{}, err
@@ -296,7 +305,7 @@ func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVM
 		if err := r.validateLVs(ctx, volumeGroup); err != nil {
 			err := fmt.Errorf("error while validating logical volumes in existing volume group: %w", err)
 			r.WarningEvent(ctx, volumeGroup, EventReasonErrorInconsistentLVs, err)
-			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, selector, vgs, devices, err); err != nil {
 				logger.Error(err, "failed to set status to failed")
 			}
 			return ctrl.Result{}, err
@@ -313,7 +322,7 @@ func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVM
 	//	return reconcileAgain, err
 	//}
 
-	if updated, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, vgs, devices); err != nil {
+	if updated, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, selector, vgs, devices); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to set status for volume group %s to ready: %w", volumeGroup.Name, err)
 	} else if updated {
 		msg := "all the available devices are attached to the volume group"
@@ -323,8 +332,8 @@ func (r *Reconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVM
 	return reconcileAgain, nil
 }
 
-func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolumeGroup) ctrl.Result {
-	if volumeGroup.Spec.DeviceSelector == nil {
+func (r *Reconciler) determineFinishedRequeue(selector *lvmv1alpha1.Selector) ctrl.Result {
+	if selector.DeviceSelector == nil {
 		return reconcileAgain
 	}
 	return ctrl.Result{}
@@ -417,7 +426,7 @@ func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolume
 //	return nil
 //}
 
-func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
+func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, selector *lvmv1alpha1.Selector) error {
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
 	logger.Info("deleting")
 
@@ -474,7 +483,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 			if thinPoolExists {
 				if err := r.LVM.DeleteLV(ctx, thinPoolName, volumeGroup.Name); err != nil {
 					err := fmt.Errorf("failed to delete thin pool %s in volume group %s: %w", thinPoolName, volumeGroup.Name, err)
-					if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); err != nil {
+					if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, selector, vgs, FilteredBlockDevices{}, err); err != nil {
 						logger.Error(err, "failed to set status to failed")
 					}
 					return err
@@ -487,7 +496,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 
 		if err = r.LVM.DeleteVG(ctx, existingVG); err != nil {
 			err := fmt.Errorf("failed to delete volume group %s: %w", volumeGroup.Name, err)
-			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); err != nil {
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, selector, vgs, FilteredBlockDevices{}, err); err != nil {
 				logger.Error(err, "failed to set status to failed", "VGName", volumeGroup.GetName())
 			}
 			return err

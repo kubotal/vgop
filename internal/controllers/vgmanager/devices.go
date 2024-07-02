@@ -137,19 +137,19 @@ func (r *Reconciler) filterDevices(ctx context.Context, devices []lsblk.BlockDev
 }
 
 // getNewDevicesToBeAdded gets all devices that should be added to the volume group
-func (r *Reconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices []lsblk.BlockDevice, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]lsblk.BlockDevice, error) {
+func (r *Reconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices []lsblk.BlockDevice, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, volumeGroup *lvmv1alpha1.LVMVolumeGroup, selector *lvmv1alpha1.Selector) ([]lsblk.BlockDevice, error) {
 	logger := log.FromContext(ctx)
 
 	var validBlockDevices []lsblk.BlockDevice
 	atLeastOneDeviceIsAlreadyInVolumeGroup := false
 
-	if volumeGroup.Spec.DeviceSelector == nil {
+	if selector.DeviceSelector == nil {
 		// return all available block devices if none is specified in the CR
 		return blockDevices, nil
 	}
 
 	// If Paths is specified, treat it as required paths
-	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
+	for _, path := range selector.DeviceSelector.Paths {
 		blockDevice, err := getValidDevice(path, blockDevices, nodeStatus, volumeGroup)
 		if err != nil {
 			// An error for required devices is critical
@@ -166,7 +166,7 @@ func (r *Reconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices []
 		validBlockDevices = append(validBlockDevices, blockDevice)
 	}
 
-	for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
+	for _, path := range selector.DeviceSelector.OptionalPaths {
 		blockDevice, err := getValidDevice(path, blockDevices, nodeStatus, volumeGroup)
 
 		// Check if we should skip this device

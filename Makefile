@@ -39,8 +39,11 @@ SHELL = /usr/bin/env bash -o pipefail
 BUILD_TS ?= $(shell date -u +%Y%m%d.%H%M%S)
 
 
-.PHONY: all
-all: help
+.PHONY: entry
+entry: help
+
+publish: chart docker-buildx doc ## Publish current version
+	@echo "********************** Don't forget to commit ***************************"
 
 ##@ General
 
@@ -62,12 +65,8 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: manifests
-manifests: controller-gen ## placeholder
-	echo "manifests task now removed"
-
-#.PHONY: manifests
-#manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-#	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -131,6 +130,8 @@ docker-buildx: version ## Build and push docker image for the manager for cross-
 	- $(CONTAINER_TOOL) buildx rm vgop-builder
 	rm Dockerfile.cross
 
+doc: ## Generate doc index
+	doctoc README.md --github --title '## Index'
 
 # ----------------------------------------------------------------
 ##@ Helm chart
@@ -161,7 +162,7 @@ chart: chart-yaml crds ## Build and push helm chart
 
 
 # ----------------------------------------------------------------
-##@ Dependencies
+##@ Tools
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin
